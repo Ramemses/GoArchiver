@@ -1,0 +1,31 @@
+package cmd
+
+import (
+	"github.com/spf13/cobra"
+	"os"
+	"fmt"
+	
+)
+
+var rootCmd = &cobra.Command{
+	Use: "archiver",
+	Short: "Simple archiver",
+
+
+}
+
+
+func Execute(){
+	if err:=rootCmd.Execute();err!=nil{
+		handleError(err)
+	}
+}
+
+
+func handleError(err error){
+
+		_, _ = fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+}
+
+
