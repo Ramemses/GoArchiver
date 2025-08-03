@@ -10,6 +10,7 @@ import (
 	"archiver/lib/compression/vlc"
 	"archiver/lib/compression"
 	"archiver/lib/compression/vlc/table/shanon_fano"
+	"archiver/lib/compression/vlc/table/haffman"
 )
 
 var packCmd = &cobra.Command{

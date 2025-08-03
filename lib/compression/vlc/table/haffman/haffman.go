@@ -1,8 +1,6 @@
 package haffman
 
 import (
-	"sort"
-	"math"
 	"fmt"
 	"strings"
 
@@ -15,79 +13,59 @@ type Generator struct{}
 
 type charStat map[rune]int
 
-type code struct{
+type Node struct{
 	Char rune
-	Quantity int
+	Quantite int
 	Bits uint32
 	Size int
-}	
-
-type encodingTable map[rune]code
-
-
-// HaffmanTree and Queue
-
-type Node struct{
-	Code code
 	Left* Node
 	Right* Node
 }
 
-type pQueue *[]Node
+type Queue []*Node
 
-func (pq* pQueue) Len() int {return len(pq)}
-
-
-func (pq* pQueue) Less(i, j int) bool{
-	return pq[i].Code.Quantity < pq[j].Code.Quantity
+func (q Queue) Len() int{
+	return len(q)
 }
 
-func (pq* pQueue) Swap(i, j int){
-	pq[i], pq[j] = pq[j], pq[i]
+func (q Queue) Less(i, j int) bool {
+    if q[i].Quantite == q[j].Quantite {
+        iLeaf := q[i].Left == nil && q[i].Right == nil
+        jLeaf := q[j].Left == nil && q[j].Right == nil
+        
+        if iLeaf && !jLeaf {
+            return false
+        }
+        if !iLeaf && jLeaf {
+            return true
+        }
+        
+        return q[i].Char < q[j].Char
+    }
+    return q[i].Quantite < q[j].Quantite
 }
 
-func (pq* pQueue) Push(x interface{}){
-	item := x.(*Node)
-	*pq = append(*pq, item)
+func (q Queue) Swap(i, j int){
+	q[i], q[j] = q[j], q[i]
 }
 
-func (pq* pQueue) Pop() interface{}{
-	old := *pq
+func (q *Queue) Push(x interface{}){
+	*q = append(*q, x.(*Node))	
+}
+
+func (q *Queue) Pop() interface{}{
+	old := *q
 	n := len(old)
+
 	item := old[n-1]
-	old = old[0:n-1]
+	*q = old[0: n-1]
 
-	return item
-}
-
-func BuildHaffmanTree(codes []code) Item{
-	
-	//Here we make queue and fill it
-	pq := make(pQueue, 0)
-	heap.Init(&pq)
-
-	for code := range codes{
-		heap.Push(&pq, &Node{Code: code})
-	}
-
-	
-	for pq.Len() > 1{
-		left := heap.Pop(&pq)
-		right := heap.Pop(&pq)
-	
-		item := Item{Code:}	
-	}
-	
+	return item 
 }
 
 
 
-//----------
-
-
-
-
-
+type encodingTable map[rune]Node
 
 func NewGenerator() Generator{
 	return Generator{}
@@ -99,6 +77,7 @@ func (g Generator) NewTable(text string) table.EncodingTable{
 		encTable := build(text)	
 		return table.EncodingTable(encTable.Export())
 }
+
 
 func (et encodingTable) Export() map[rune]string{
 	res := make(map[rune]string)
@@ -119,80 +98,102 @@ func (et encodingTable) Export() map[rune]string{
 
 
 func build(str string) encodingTable{
-	
+
 	stat := newCharStat(str)
-	codes := make([]code, 0, len(stat))
+	queue := &Queue{}
+	heap.Init(queue)
 
 	for ch, qty := range stat{
-		codes = append(codes, code{
-				Char: ch,
-				Quantity: qty,
-			})
+		item := &Node{
+			Char: ch,
+			Quantite: qty,
+		}
+		heap.Push(queue, item)
 	}
 
-	sort.Slice(codes, func(i, j int) bool {
-		if codes[i].Quantity != codes[j].Quantity{
-			return codes[i].Quantity > codes[j].Quantity
-		}
-		return codes[i].Char < codes[j].Char	
-	})
 
-//TODO: Make haffman assignCodes
-	assignCodes(codes)
+	if queue.Len() == 0{
+		return encodingTable{}
+	}
+
+	root := buildHaffmanTree(queue)	
 
 	res := make(encodingTable)
-	
-	for _, code := range codes{
-		res[code.Char] = code
-	}
-	
+	assignCodes(root, res)	
+
+
 	return res
 }
 
-//TODO: Make Haffman assignCodes
-func assignCodes(codes []code){
-	if len(codes) == 0{
-		return 
-	}
-	if len(codes) == 1{
-		if codes[0].Size == 0{
-			codes[0].Bits <<= 1
-			codes[0].Size++
 
+
+func buildHaffmanTree(queue *Queue) *Node{
+	
+	if queue.Len() == 0{
+		return nil
+	}
+		
+
+	for queue.Len() > 1{
+		left := heap.Pop(queue).(*Node)
+		right := heap.Pop(queue).(*Node)
+
+		parent := &Node{
+			Quantite: left.Quantite + right.Quantite,
+			Left: left,
+			Right: right,
 		}
-		return 
+
+		heap.Push(queue, parent)
 	}
 
-// REPEAT UNTIL Len(queue) > 1
-
-	//Pop 2 elements with least quantites
-	
-	//Make Node, where fst element equals Node.Left and snd equals Node.Right
-
-	//Insert Node in queue 
-	
-// Work with HaffmanTree
-
-	//Walk for each Node and:
-		// When we go to right, we add '1' into char-code
-		// When we go to left, we add '0' into char-code
-		// Then we check existing of Node.Code.Char in codes and give codes[Node.Code.Char] the current code if that true
-
-	
-
-	//return codes
+	root := heap.Pop(queue).(*Node)
 
 
+	return root
 }
 
 
-func abs(x int)int{
-	if x < 0{
-		x = -x
-	}
-	return x
+func assignCodes(node *Node, table encodingTable) {
+    if node == nil {
+        return
+    }
+    
+    var traverse func(n *Node, code uint32, size int)
+    traverse = func(n *Node, code uint32, size int) {
+        if n == nil {
+            return
+        }
+        
+        if n.Left == nil && n.Right == nil {
+            table[n.Char] = Node{
+                Char:     n.Char,
+                Quantite: n.Quantite,
+                Bits:     code,
+                Size:     size,
+            }
+            return
+        }
+        
+        if n.Left != nil {
+            traverse(n.Left, code<<1, size+1)
+        }
+        if n.Right != nil {
+            traverse(n.Right, (code<<1)|1, size+1)
+        }
+    }
+    
+    if node.Left == nil && node.Right == nil {
+        table[node.Char] = Node{
+            Char:     node.Char,
+            Quantite: node.Quantite,
+            Bits:     0,
+            Size:     1,
+        }
+    } else {
+        traverse(node, 0, 0)
+    }
 }
-
 
 func newCharStat(text string) charStat{
 
@@ -204,4 +205,3 @@ func newCharStat(text string) charStat{
 	
 	return res
 }
-
